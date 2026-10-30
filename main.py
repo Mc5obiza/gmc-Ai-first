@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import json
 import os
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT = SYSTEM_PROMPT = """
 You are an AI Teacher and Academic Student Assistant.
 IDENTITY:
 You act as a knowledgeable, patient, and professional teacher whose mission is to help students learn, understand, practice, and improve their academic skills. You are an educator first, not a general-purpose chatbot.
@@ -107,44 +107,53 @@ def save_conversation(file_path, history):
     with open(file_path,"w") as f:
         json.dump(history,f)
 api_key = os.getenv("OPEN_ROUTER_KEY")
-if not api_key:
-    raise ValueError("A777AA")
-try:
-    client = OpenAI(api_key=api_key, base_url = "https://openrouter.ai/api/v1")
-except Exception as e:
-    print(f"Error sratie wa9tili sna3te el client : {e}")
+
+def init_api():
+    if not api_key:
+        raise ValueError("A777AA")
+    try:
+        client = OpenAI(api_key=api_key, base_url = "https://openrouter.ai/api/v1")
+    except Exception as e:
+        print(f"Error sratie wa9tili sna3te el client : {e}")
+    return client
+
+def client_response(stream,response_parts):
+    for chunk in stream:
+                if chunk.usage:
+                    usage["completion_token"]+=chunk.usage.completion_tokens
+                    usage["prompt_tokens"] += chunk.usage.prompt_tokens
+                    usage["total_token"] +=chunk.usage.total_tokens
+                    usage["model"] = chunk.model
+                if chunk.choices:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        print(content,end="",flush=True)
+                        response_parts.append(content)
+def chat():
+    while True:
+        prompt = input(">")
+        if prompt.startswith("/exit"):
+            break
+        # message = client.chat.completions.create(
+        #     model = "openrouter/free",
+        #     messages=[{"role":"user","content":prompt}]
+        # )
+        # print(message.choices[0].message.content)
+        # example stream
+        memory.append({"role":"user","content":prompt})
+        stream = client.chat.completions.create(
+            model="openrouter/free",
+            messages=memory,
+            stream=True,temperature=1)
+        response_parts = []
+        response_parts=client_response(stream,response_parts)
+        print()
+    memory.append({"role":"assistant","content":"".join(response_parts)})
 # Example chat
 usage = {
     "prompt_tokens":0,"completion_token":0,"total_token":0,"model":None
 }
+client=init_api()
 memory = load_conversation("conversation_history.json")
-while True:
-    prompt = input(">")
-    if prompt.startswith("/exit"):
-        break
-    # message = client.chat.completions.create(
-    #     model = "openrouter/free",
-    #     messages=[{"role":"user","content":prompt}]
-    # )
-    # print(message.choices[0].message.content)
-    # example stream
-    memory.append({"role":"user","content":prompt})
-    stream = client.chat.completions.create(
-        model="openrouter/free",
-        messages=memory,
-        stream=True,temperature=1)
-    response_parts = []
-    for chunk in stream:
-        if chunk.usage:
-            usage["completion_token"]+=chunk.usage.completion_tokens
-            usage["prompt_tokens"] += chunk.usage.prompt_tokens
-            usage["total_token"] +=chunk.usage.total_tokens
-            usage["model"] = chunk.model
-        if chunk.choices:
-            content = chunk.choices[0].delta.content
-            if content:
-                print(content,end="",flush=True)
-                response_parts.append(content)
-    print()
-    memory.append({"role":"assistant","content":"".join(response_parts)})
+chat()
 save_conversation("conversation_history.json",memory)
